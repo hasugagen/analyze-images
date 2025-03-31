@@ -40,7 +40,16 @@ class ImageAnalysisConfig:
 
 @contextmanager
 def get_mysql_connection(config: Dict[str, Any]):
-    """データベース接続のコンテキストマネージャー"""
+    """
+    MySQLへの接続を管理するコンテキストマネージャー
+    with文で使用することで、処理完了後に自動的に接続をクローズする
+    
+    Args:
+        config: データベース接続パラメータを含む辞書
+        
+    Yields:
+        mysql.connector.connection: データベース接続オブジェクト
+    """
     connection = None
     try:
         connection = mysql.connector.connect(**config)
@@ -53,7 +62,13 @@ def get_mysql_connection(config: Dict[str, Any]):
             connection.close()
 
 class ImageAnalyzer:
+    """画像分析とその結果をデータベースに記録するクラス"""
     def __init__(self, api_url: str, mysql_config: Dict[str, Any]):
+        """
+        Args:
+            api_url: 画像分析APIのエンドポイントURL
+            mysql_config: MySQLデータベース接続設定
+        """
         self.api_url = api_url
         self.mysql_config = mysql_config
 
@@ -68,7 +83,19 @@ class ImageAnalyzer:
         request_timestamp: Optional[datetime.datetime] = None,
         response_timestamp: Optional[datetime.datetime] = None
     ) -> None:
-        """分析結果をデータベースに安全に挿入"""
+        """
+        分析結果をデータベースのログテーブルに挿入
+        
+        Args:
+            connection: アクティブなデータベース接続
+            image_path: 分析した画像のパス
+            success: 分析の成功/失敗フラグ
+            message: エラーメッセージまたは追加情報
+            class_val: 分類結果のクラス名
+            confidence: 分類結果の信頼度
+            request_timestamp: APIリクエスト時のタイムスタンプ
+            response_timestamp: APIレスポンス受信時のタイムスタンプ
+        """
         try:
             with connection.cursor() as cursor:
                 insert_query = """
@@ -86,7 +113,15 @@ class ImageAnalyzer:
             logger.error(f"ログ保存エラー: {e}")
 
     def analyze_image(self, image_path: str) -> Dict[str, Any]:
-        """画像分析とログ記録を行う"""
+        """
+        画像をAPIで分析し、結果をデータベースに記録
+        
+        Args:
+            image_path: 分析対象の画像パス
+            
+        Returns:
+            Dict[str, Any]: API応答データまたはエラー情報を含む辞書
+        """
         request_timestamp = datetime.datetime.now()
 
         try:
@@ -121,6 +156,7 @@ class ImageAnalyzer:
             return {"success": False, "message": str(e), "estimated_data": {}}
 
 def main():
+    """メイン処理: 複数のテスト画像に対して分析を実行"""
     try:
         mysql_config = ImageAnalysisConfig.get_mysql_config()
         analyzer = ImageAnalyzer(ImageAnalysisConfig.API_URL, mysql_config)
